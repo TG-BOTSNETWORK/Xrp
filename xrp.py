@@ -12,6 +12,7 @@ from fake_useragent import UserAgent
 from bs4 import BeautifulSoup
 from random import choice
 import ntplib
+from datetime import datetime
 
 proxy_list = []
 user_data = {}
@@ -21,10 +22,12 @@ def sync_time():
     try:
         ntp_client = ntplib.NTPClient()
         response = ntp_client.request("pool.ntp.org")
-        time_offset = response.offset
-        time.sleep(time_offset)  # Adjust the offset
+        # Sync system time
+        ntp_time = datetime.utcfromtimestamp(response.tx_time)
+        print(f"[bold green]System time synchronized to NTP: {ntp_time} UTC[/bold green]")
     except Exception as e:
         print(f"[bold red]Failed to sync time: {e}[/bold red]")
+        time.sleep(5)  # Retry delay
 
 # Sync system time before running the bot
 sync_time()
@@ -40,12 +43,16 @@ bot = Client(
 # Helper function to update proxies
 def update_proxies():
     global proxy_list
-    with open('proxy.json') as file:
-        datahttp = json.load(file)
-    for dhttp in datahttp:
-        response = requests.get(dhttp)
-        proxies = response.text.split('\n')
-        proxy_list = [proxy.strip() for proxy in proxies if proxy.strip()]
+    try:
+        with open('proxy.json') as file:
+            datahttp = json.load(file)
+        for dhttp in datahttp:
+            response = requests.get(dhttp)
+            proxies = response.text.split('\n')
+            proxy_list = [proxy.strip() for proxy in proxies if proxy.strip()]
+        print("[bold green]Proxies updated successfully.[/bold green]")
+    except Exception as e:
+        print(f"[bold red]Error updating proxies: {e}[/bold red]")
 
 # Helper function to select a random proxy
 def get_proxy():
@@ -69,42 +76,45 @@ def start_mining(email, password, xrp_address, destination_tag):
     })
 
     # Login to the platform
-    response = session.post("https://faucetearner.org/api.php?act=login", json={
-        "email": email,
-        "password": password
-    }, proxies=get_proxy())
+    try:
+        response = session.post("https://faucetearner.org/api.php?act=login", json={
+            "email": email,
+            "password": password
+        }, proxies=get_proxy())
 
-    if response.status_code == 200:
-        cookies = response.cookies.get_dict()
-        if cookies.get("login"):
-            success = []
-            failed = []
+        if response.status_code == 200:
+            cookies = response.cookies.get_dict()
+            if cookies.get("login"):
+                success = []
+                failed = []
 
-            # Mining process
-            r = session.get('https://faucetearner.org/faucet.php', proxies=get_proxy())
-            r.headers.update({
-                'Accept': 'application/json, text/javascript, */*; q=0.01',
-                'Content-Type': 'application/json',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Site': 'same-origin',
-                'Sec-Fetch-Mode': 'cors',
-                'Host': 'faucetearner.org',
-                'Origin': 'https://faucetearner.org',
-            })
-            r2 = session.post('https://faucetearner.org/api.php?act=faucet', data={}, proxies=get_proxy())
+                # Mining process
+                r = session.get('https://faucetearner.org/faucet.php', proxies=get_proxy())
+                r.headers.update({
+                    'Accept': 'application/json, text/javascript, */*; q=0.01',
+                    'Content-Type': 'application/json',
+                    'Sec-Fetch-Dest': 'empty',
+                    'Sec-Fetch-Site': 'same-origin',
+                    'Sec-Fetch-Mode': 'cors',
+                    'Host': 'faucetearner.org',
+                    'Origin': 'https://faucetearner.org',
+                })
+                r2 = session.post('https://faucetearner.org/api.php?act=faucet', data={}, proxies=get_proxy())
 
-            if 'congratulations' in r2.text.lower():
-                success.append("Mining successful!")
-            elif 'you have already' in r2.text.lower():
-                failed.append("Mining failed: Already claimed.")
+                if 'congratulations' in r2.text.lower():
+                    success.append("Mining successful!")
+                elif 'you have already' in r2.text.lower():
+                    failed.append("Mining failed: Already claimed.")
+                else:
+                    failed.append("Mining failed: Unknown error.")
+
+                return {"success": success, "failed": failed}
             else:
-                failed.append("Mining failed: Unknown error.")
-
-            return {"success": success, "failed": failed}
+                return {"error": "Login failed: Invalid credentials"}
         else:
-            return {"error": "Login failed: Invalid credentials"}
-    else:
-        return {"error": "Failed to connect to the platform"}
+            return {"error": "Failed to connect to the platform"}
+    except Exception as e:
+        return {"error": f"Exception occurred: {e}"}
 
 @bot.on_message(filters.command("start") & filters.private)
 async def start(client, message):
