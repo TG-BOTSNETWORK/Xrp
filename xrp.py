@@ -11,10 +11,23 @@ from rich import print
 from fake_useragent import UserAgent
 from bs4 import BeautifulSoup
 from random import choice
-
+import ntplib
 
 proxy_list = []
 user_data = {}
+
+# Function to sync system time
+def sync_time():
+    try:
+        ntp_client = ntplib.NTPClient()
+        response = ntp_client.request("pool.ntp.org")
+        time_offset = response.offset
+        time.sleep(time_offset)  # Adjust the offset
+    except Exception as e:
+        print(f"[bold red]Failed to sync time: {e}[/bold red]")
+
+# Sync system time before running the bot
+sync_time()
 
 # Initialize Pyrogram client
 bot = Client(
@@ -23,7 +36,6 @@ bot = Client(
     api_hash="5c096f7e8fd4c38c035d53dc5a85d768",
     bot_token="7261854045:AAGv8_bgcspRJ_LAMJjwaX_AAe8dSGMXEo4"
 )
-
 
 # Helper function to update proxies
 def update_proxies():
@@ -35,14 +47,12 @@ def update_proxies():
         proxies = response.text.split('\n')
         proxy_list = [proxy.strip() for proxy in proxies if proxy.strip()]
 
-
 # Helper function to select a random proxy
 def get_proxy():
     if proxy_list:
         proxy = choice(proxy_list).replace('http://', '')
         return {"http": f"http://{proxy}"}
     return None
-
 
 # Mining logic
 def start_mining(email, password, xrp_address, destination_tag):
@@ -96,14 +106,12 @@ def start_mining(email, password, xrp_address, destination_tag):
     else:
         return {"error": "Failed to connect to the platform"}
 
-
 @bot.on_message(filters.command("start") & filters.private)
 async def start(client, message):
     await message.reply_text(
         "Welcome to XRP Miner Bot! Please send your email to login:"
     )
     user_data[message.chat.id] = {}
-
 
 @bot.on_message(filters.private & ~filters.command("start"))
 async def collect_user_data(client, message):
@@ -137,7 +145,6 @@ async def collect_user_data(client, message):
             ])
         )
 
-
 @bot.on_callback_query(filters.regex("start_mining"))
 async def start_mining_handler(client, callback_query):
     chat_id = callback_query.message.chat.id
@@ -165,7 +172,6 @@ async def start_mining_handler(client, callback_query):
             f"Success: {success}\n"
             f"Failed: {failed}"
         )
-
 
 if __name__ == "__main__":
     update_proxies()
