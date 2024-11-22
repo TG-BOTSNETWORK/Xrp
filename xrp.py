@@ -118,10 +118,24 @@ def start_mining(email, password, xrp_address, destination_tag):
 
 @bot.on_message(filters.command("start") & filters.private)
 async def start(client, message):
-    await message.reply_text(
-        "Welcome to XRP Miner Bot! Please send your email to login:"
-    )
-    user_data[message.chat.id] = {}
+    chat_id = message.chat.id
+    
+    # If the user has already started, greet them and ask if they want to continue
+    if chat_id in user_data:
+        await message.reply_text(
+            f"Welcome back, {message.from_user.first_name}! 👋\n\n"
+            "You already started the setup process. If you'd like to continue, just send your credentials."
+            "\nOr type /reset to start from scratch if needed."
+        )
+    else:
+        # New user, initiate the process
+        user_data[chat_id] = {}
+        await message.reply_text(
+            "Welcome to the **XRP Miner Bot**! 🚀\n\n"
+            "Please send your **email** to begin the login process. We'll use this to secure your mining account.\n"
+            "_Note: We will never share your data._\n\n"
+            "Let's get started! Just type in your email."
+        )
 
 @bot.on_message(filters.private & ~filters.command("start"))
 async def collect_user_data(client, message):
