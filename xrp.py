@@ -98,10 +98,9 @@ def start_mining(email, password, xrp_address, destination_tag):
 
 
 @bot.on_message(filters.command("start") & filters.private)
-async def start_handler(client, message):
-    await message.reply(
-        "Welcome to XRP Miner Bot! Please send your email to login:",
-        reply_markup=InlineKeyboardMarkup([])
+async def start(client, message):
+    await message.reply_text(
+        "Welcome to XRP Miner Bot! Please send your email to login:"
     )
     user_data[message.chat.id] = {}
 
