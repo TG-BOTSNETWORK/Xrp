@@ -1,9 +1,11 @@
 import json
 import requests
 import asyncio
+import os
+import ntplib
+from time import ctime
+from pyrogram import filters
 from pyromod import Client, Message
-from hydrogram import filters
-from hydrogram.errors import BadMsgNotification
 
 bot = Client(
     "xrpminerbot",
@@ -13,6 +15,17 @@ bot = Client(
 )
 
 user_data = {}
+
+
+def sync_time():
+    try:
+        ntp_client = ntplib.NTPClient()
+        response = ntp_client.request('pool.ntp.org')
+        os.system(f"date -s '{ctime(response.tx_time)}'")
+        print("System time synchronized successfully.")
+    except Exception as e:
+        print(f"Failed to synchronize time: {e}")
+
 
 def start_mining_with_cookies(cookies, xrp_address, destination_tag):
     session = requests.Session()
@@ -38,6 +51,7 @@ def start_mining_with_cookies(cookies, xrp_address, destination_tag):
     except Exception as e:
         return {"error": f"Exception occurred: {e}"}
 
+
 @bot.on_message(filters.command("start") & filters.private)
 async def start(client, message):
     chat_id = message.chat.id
@@ -59,6 +73,7 @@ async def start(client, message):
         user_data[chat_id]["destination_tag"] = destination_tag.text
         await message.reply_text("Details saved. You can start mining with /mine.")
 
+
 @bot.on_message(filters.command("mine") & filters.private)
 async def mine(client, message):
     chat_id = message.chat.id
@@ -76,6 +91,7 @@ async def mine(client, message):
         failed = "\n".join(result["failed"]) if result["failed"] else "None"
         await message.reply_text(f"Mining Summary:\nSuccess: {success}\nFailed: {failed}")
 
+
 @bot.on_message(filters.command("reset") & filters.private)
 async def reset(client, message):
     chat_id = message.chat.id
@@ -85,5 +101,7 @@ async def reset(client, message):
     else:
         await message.reply_text("No data to reset. Type /start to set up.")
 
+
 if __name__ == "__main__":
+    sync_time()
     asyncio.run(bot.start())
