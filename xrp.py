@@ -102,10 +102,9 @@ def fetch_xrp_balance(cookie_string):
 
 
 class CustomPDF(FPDF):
-    def header(self, message):
-        chat_id = message.chat.id
+    def header(self):
         self.set_font('Arial', 'B', 12)
-        self.cell(0, 10, f"FIRST NAME: {user_data[chat_id]['first_name']}   User ID: {chat_id}   PDF ID: {generate_pdf_id()}", ln=True, align='C')
+        self.cell(0, 10, f"FIRST NAME: {user_data[self.chat_id]['first_name']}   User ID: {self.chat_id}   PDF ID: {generate_pdf_id()}", ln=True, align='C')
         self.ln(10)
 
     def footer(self):
@@ -129,6 +128,7 @@ def generate_pdf_id():
 
 
 def generate_pdf(message, cookies, balance_info):
+    chat_id = message.chat.id  # Get chat_id directly from the message object
     pdf = CustomPDF()
     pdf.add_page()
     pdf.set_background('background.jpg')
