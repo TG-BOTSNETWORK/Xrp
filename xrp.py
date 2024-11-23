@@ -105,9 +105,6 @@ class CustomPDF(FPDF):
     def __init__(self, chat_id, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.chat_id = chat_id
-        # Add a Unicode font (TrueType Font)
-        self.add_font('Arial', '', 'Arial.ttf', uni=True)  # Use your TTF file path
-        self.set_font('Arial', '', 12)  # Set font to Arial for Unicode support
 
     def header(self):
         self.set_font('Arial', 'B', 12)
@@ -128,6 +125,7 @@ class CustomPDF(FPDF):
 
     def set_background(self, image_path):
         self.image(image_path, x=0, y=0, w=self.w, h=self.h)
+
 
 def generate_pdf_id():
     return ''.join(random.choices(string.ascii_letters + string.digits, k=8))
