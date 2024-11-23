@@ -3,9 +3,9 @@
 import json
 import requests
 import time
-from pyrogram import Client, filters
+from pyromod import Client, Message
+from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from pyromod.listen import listen
 from rich import print
 
 # Initialize Pyrogram client
