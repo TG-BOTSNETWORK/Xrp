@@ -2,8 +2,8 @@ import json
 import requests
 import asyncio
 from pyromod import Client, Message
-from pyrogram import filters
-from pyrogram.errors import BadMsgNotification
+from hydrogram import filters
+from hydrogram.errors import BadMsgNotification
 
 bot = Client(
     "xrpminerbot",
