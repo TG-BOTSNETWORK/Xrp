@@ -3,12 +3,14 @@ import requests
 import asyncio
 import os
 import ntplib
-from time import ctime
-from pyrogram import filters, Client as hmm
-from pyromod import Client, Message
-from pyromod import listen #type : ignore
+from time import ctime, sleep
+from pyrogram import filters, idle
+from pyrogram.types import Message
+from pyrogram import Client
+from pyromod import listen  # type: ignore
+from fpdf import FPDF  # For creating the PDF
 
-bot = hmm(
+bot = Client(
     "xrpminerbot",
     api_id=22363963,
     api_hash="5c096f7e8fd4c38c035d53dc5a85d768",
@@ -28,7 +30,23 @@ def sync_time():
         print(f"Failed to synchronize time: {e}")
 
 
-def start_mining_with_cookies(cookies, xrp_address, destination_tag):
+def parse_cookies(cookie_string):
+    """
+    Convert plain text cookies to a dictionary format.
+    """
+    cookies_dict = {}
+    cookies = cookie_string.split(";")
+    for cookie in cookies:
+        if "=" in cookie:
+            key, value = cookie.strip().split("=", 1)
+            cookies_dict[key] = value
+    return cookies_dict
+
+
+def validate_and_fetch_user_info(cookie_string):
+    """
+    Validate the cookies and fetch user login information.
+    """
     session = requests.Session()
     session.headers.update({
         'Accept': 'application/json, text/javascript, */*; q=0.01',
@@ -39,61 +57,232 @@ def start_mining_with_cookies(cookies, xrp_address, destination_tag):
         'Host': 'faucetearner.org',
         'Origin': 'https://faucetearner.org',
     })
-    session.cookies.update(cookies)
+    session.cookies.update(parse_cookies(cookie_string))
 
     try:
-        r2 = session.post('https://faucetearner.org/api.php?act=faucet', data={})
-        if 'congratulations' in r2.text.lower():
-            return {"success": ["Mining successful!"], "failed": []}
-        elif 'you have already' in r2.text.lower():
-            return {"success": [], "failed": ["Mining failed: Already claimed."]}
+        response = session.get('https://faucetearner.org/api.php?act=faucet')
+        
+        # Log the raw response text
+        print(f"Raw server response: {response.text}")
+
+        # Check for valid JSON response
+        if response.status_code == 200:
+            try:
+                # Attempt to parse JSON response
+                user_info = response.json()
+                email = user_info.get("email", "N/A")
+                username = user_info.get("username", "N/A")
+                return {"email": email, "username": username}
+            except json.JSONDecodeError:
+                return {"error": f"Invalid response format (expected JSON): {response.text}"}
         else:
-            return {"success": [], "failed": ["Mining failed: Unknown error."]}
+            return {"error": f"HTTP Error: {response.status_code} - {response.text}"}
     except Exception as e:
-        return {"error": f"Exception occurred: {e}"}
+        return {"error": f"Exception during login validation: {e}"}
 
 
-@Client.on_message(filters.command("start") & filters.private)
+def fetch_xrp_balance(cookie_string):
+    """
+    Fetch the XRP balance of the user using the provided cookies.
+    """
+    session = requests.Session()
+    session.headers.update({
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Content-Type': 'application/json',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-Mode': 'cors',
+        'Host': 'faucetearner.org',
+        'Origin': 'https://faucetearner.org',
+    })
+    session.cookies.update(parse_cookies(cookie_string))
+
+    try:
+        response = session.get('https://faucetearner.org/api.php?act=withdraw')
+        if response.status_code == 200:
+            try:
+                # Assuming response contains balance information
+                balance_info = response.json()
+                withdrawal_amount = balance_info.get("withdrawal_amount", 0)
+                total_balance = balance_info.get("total_balance", 0)
+                return {"withdrawal_amount": withdrawal_amount, "total_balance": total_balance}
+            except json.JSONDecodeError:
+                return {"error": f"Invalid response format for balance: {response.text}"}
+        else:
+            return {"error": f"HTTP Error: {response.status_code} - {response.text}"}
+    except Exception as e:
+        return {"error": f"Exception during balance retrieval: {e}"}
+
+
+from fpdf import FPDF
+
+class CustomPDF(FPDF):
+    def header(self):
+        """
+        Add a logo and header title.
+        """
+        self.set_font('Arial', 'B', 12)
+        # Add logo
+        self.image('logo.png', 10, 8, 33)  # Ensure you have a logo image saved as 'logo.png'
+        self.cell(0, 10, 'XRP Balance Report', ln=True, align='C')
+        self.ln(10)
+
+    def footer(self):
+        """
+        Add the bot creator's signature at the bottom.
+        """
+        self.set_y(-30)
+        self.set_font('Arial', 'I', 10)
+        self.cell(0, 10, 'Report generated by XRP Miner Bot - Created by YourName', ln=True, align='C')
+
+    def add_watermark(self, text):
+        """
+        Add a watermark across the page.
+        """
+        self.set_font('Arial', 'B', 50)
+        self.set_text_color(200, 200, 200)
+        self.rotate(45, x=55, y=100)  # Rotate watermark
+        self.text(50, 150, text)
+        self.rotate(0)
+
+    def set_background(self, image_path):
+        """
+        Set a background image for the PDF.
+        """
+        self.image(image_path, x=0, y=0, w=self.w, h=self.h)
+
+
+def generate_pdf(cookies, balance_info):
+    """
+    Generate a styled PDF with the balance information.
+    """
+    pdf = CustomPDF()
+    pdf.add_page()
+
+    # Add background
+    pdf.set_background('background.jpg')  # Ensure you have a background image saved as 'background.jpg'
+
+    # Add watermark
+    pdf.add_watermark('Trickopedia')
+
+    # Start creating the main content
+    pdf.set_font("Arial", size=12)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(40)  # Adjust for centering
+
+    # Display cookies with masking for security
+    pdf.cell(0, 10, txt=f"Cookies: {cookies[:8]}******{cookies[-8:]}", ln=True, align="C")
+    pdf.ln(10)
+
+    # Table header
+    pdf.cell(60, 10, "S No.", border=1, align="C")
+    pdf.cell(60, 10, "Withdrawal Amount", border=1, align="C")
+    pdf.cell(60, 10, "Total Balance", border=1, align="C")
+    pdf.ln()
+
+    # Table data
+    pdf.cell(60, 10, "1", border=1, align="C")
+    pdf.cell(60, 10, str(balance_info["withdrawal_amount"]), border=1, align="C")
+    pdf.cell(60, 10, str(balance_info["total_balance"]), border=1, align="C")
+    pdf.ln(20)
+
+    # Footer signature
+    pdf.cell(0, 10, "This is an autogenerated report. Contact support for assistance.", ln=True, align="C")
+
+    # Save the PDF
+    pdf.output("xrp_balance_report.pdf")
+
+
+
+@bot.on_message(filters.command("start") & filters.private)
 async def start(client: Client, message: Message):
     chat_id = message.chat.id
     if chat_id in user_data:
         await message.reply_text(
             f"Welcome back, {message.from_user.first_name}!\n"
-            "You already provided your cookies. Type /reset to start over or /mine to begin mining."
+            "You already provided your cookies. Type /reset to reset your cookies or /mine to start mining."
         )
     else:
         user_data[chat_id] = {}
-        await chat_id.ask("Send your cookies in JSON format (e.g., `{\"cookie_name\": \"cookie_value\"}`).")
+        await message.reply_text("Send your cookies as plain text.")
         cookies = await client.listen(chat_id)
-        user_data[chat_id]["cookies"] = json.loads(cookies.text)
-        await chat_id.ask("Now send your XRP address:")
-        xrp_address = await client.listen(chat_id)
-        user_data[chat_id]["xrp_address"] = xrp_address.text
-        await chat_id.ask("Finally, send your destination tag:")
-        destination_tag = await client.listen(chat_id)
-        user_data[chat_id]["destination_tag"] = destination_tag.text
-        await message.reply_text("Details saved. You can start mining with /mine.")
+        user_data[chat_id]["cookies"] = cookies.text.strip()
+        result = validate_and_fetch_user_info(user_data[chat_id]["cookies"])
+        
+        if "error" in result:
+            del user_data[chat_id]
+            await message.reply_text(f"Invalid cookies: {result['error']}. Type /start to try again.")
+        else:
+            email = result["email"]
+            username = result["username"]
+            await message.reply_text(
+                f"Cookies validated successfully!\n"
+                f"Email: {email}\n"
+                f"Username: {username}\n"
+                "Type /mine to start mining."
+            )
+            user_data[chat_id]["email"] = email
+            user_data[chat_id]["username"] = username
+            await message.reply_text(f"Here are your cookies in JSON format: \n{json.dumps(user_data[chat_id]['cookies'], indent=4)}")
 
 
-@Client.on_message(filters.command("mine") & filters.private)
+@bot.on_message(filters.command("mine") & filters.private)
 async def mine(client, message):
     chat_id = message.chat.id
-    if chat_id not in user_data or not all(key in user_data[chat_id] for key in ["cookies", "xrp_address", "destination_tag"]):
-        await message.reply_text("Provide cookies, XRP address, and destination tag first. Type /start to begin.")
+    if chat_id not in user_data or "cookies" not in user_data[chat_id]:
+        await message.reply_text("Provide your cookies first. Type /start to begin.")
         return
 
-    user = user_data[chat_id]
-    result = start_mining_with_cookies(user["cookies"], user["xrp_address"], user["destination_tag"])
-
+    cookies = user_data[chat_id]["cookies"]
+    result = validate_and_fetch_user_info(cookies)
+    
     if "error" in result:
-        await message.reply_text(f"Mining failed: {result['error']}")
-    else:
-        success = "\n".join(result["success"]) if result["success"] else "None"
-        failed = "\n".join(result["failed"]) if result["failed"] else "None"
-        await message.reply_text(f"Mining Summary:\nSuccess: {success}\nFailed: {failed}")
+        await message.reply_text(f"Error: {result['error']}")
+        return
+
+    email = result["email"]
+    username = result["username"]
+    user_data[chat_id].update({"email": email, "username": username})
+
+    await message.reply_text(
+        f"Mining started for user:\nEmail: {email}\nUsername: {username}\n"
+        "Mining summary will be provided shortly."
+    )
+
+    # Automatically retry mining every 2 minutes
+    for _ in range(10):  # Repeat for 20 minutes (10 retries)
+        sleep(120)  # Wait for 2 minutes
+        mining_result = validate_and_mine(cookies)
+        if "error" in mining_result:
+            await message.reply_text(f"Error during retry: {mining_result['error']}")
+            break
+        else:
+            success = mining_result.get("success", "None")
+            failed = mining_result.get("failed", "None")
+            await message.reply_text(f"Retry Mining Summary:\nSuccess: {success}\nFailed: {failed}")
 
 
-@Client.on_message(filters.command("reset") & filters.private)
+@bot.on_message(filters.command("balance") & filters.private)
+async def balance(client, message: Message):
+    chat_id = message.chat.id
+    if chat_id not in user_data or "cookies" not in user_data[chat_id]:
+        await message.reply_text("Provide your cookies first. Type /start to begin.")
+        return
+
+    cookies = user_data[chat_id]["cookies"]
+    balance_info = fetch_xrp_balance(cookies)
+    
+    if "error" in balance_info:
+        await message.reply_text(f"Error fetching balance: {balance_info['error']}")
+        return
+
+    generate_pdf(cookies, balance_info)
+
+    # Send the generated PDF filef
+    await client.send_document(chat_id, "xrp_balance_report.pdf")
+
+
+@bot.on_message(filters.command("reset") & filters.private)
 async def reset(client, message):
     chat_id = message.chat.id
     if chat_id in user_data:
@@ -103,6 +292,16 @@ async def reset(client, message):
         await message.reply_text("No data to reset. Type /start to set up.")
 
 
+async def main():
+    try:
+        await bot.start()
+        print("Bot started!")
+    except Exception as e:
+        print(f"Failed to start bot: {e}")
+    await idle()
+
+
 if __name__ == "__main__":
     sync_time()
-    asyncio.run(bot.start())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
