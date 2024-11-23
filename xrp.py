@@ -103,7 +103,7 @@ def fetch_xrp_balance(cookie_string):
 
 class CustomPDF(FPDF):
     def header(self):
-        self.set_font('Days', 'B', 12)
+        self.set_font('Arial', 'B', 12)
         self.cell(0, 10, f"FIRST NAME: {user_data[chat_id]['first_name']}   User ID: {chat_id}   PDF ID: {generate_pdf_id()}", ln=True, align='C')
         self.ln(10)
 
