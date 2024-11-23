@@ -4,10 +4,11 @@ import asyncio
 import os
 import ntplib
 from time import ctime
-from pyrogram import filters
+from pyrogram import filters, Client as hmm
 from pyromod import Client, Message
+from pyromod import listen #type : ignore
 
-bot = Client(
+bot = hmm(
     "xrpminerbot",
     api_id=22363963,
     api_hash="5c096f7e8fd4c38c035d53dc5a85d768",
@@ -52,8 +53,8 @@ def start_mining_with_cookies(cookies, xrp_address, destination_tag):
         return {"error": f"Exception occurred: {e}"}
 
 
-@bot.on_message(filters.command("start") & filters.private)
-async def start(client, message):
+@Client.on_message(filters.command("start") & filters.private)
+async def start(client: Client, message: Message):
     chat_id = message.chat.id
     if chat_id in user_data:
         await message.reply_text(
@@ -62,19 +63,19 @@ async def start(client, message):
         )
     else:
         user_data[chat_id] = {}
-        await message.reply_text("Send your cookies in JSON format (e.g., `{\"cookie_name\": \"cookie_value\"}`).")
+        await chat_id.ask("Send your cookies in JSON format (e.g., `{\"cookie_name\": \"cookie_value\"}`).")
         cookies = await client.listen(chat_id)
         user_data[chat_id]["cookies"] = json.loads(cookies.text)
-        await message.reply_text("Now send your XRP address:")
+        await chat_id.ask("Now send your XRP address:")
         xrp_address = await client.listen(chat_id)
         user_data[chat_id]["xrp_address"] = xrp_address.text
-        await message.reply_text("Finally, send your destination tag:")
+        await chat_id.ask("Finally, send your destination tag:")
         destination_tag = await client.listen(chat_id)
         user_data[chat_id]["destination_tag"] = destination_tag.text
         await message.reply_text("Details saved. You can start mining with /mine.")
 
 
-@bot.on_message(filters.command("mine") & filters.private)
+@Client.on_message(filters.command("mine") & filters.private)
 async def mine(client, message):
     chat_id = message.chat.id
     if chat_id not in user_data or not all(key in user_data[chat_id] for key in ["cookies", "xrp_address", "destination_tag"]):
@@ -92,7 +93,7 @@ async def mine(client, message):
         await message.reply_text(f"Mining Summary:\nSuccess: {success}\nFailed: {failed}")
 
 
-@bot.on_message(filters.command("reset") & filters.private)
+@Client.on_message(filters.command("reset") & filters.private)
 async def reset(client, message):
     chat_id = message.chat.id
     if chat_id in user_data:
