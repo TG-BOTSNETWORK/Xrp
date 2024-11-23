@@ -7,6 +7,8 @@ from pyromod import Client, Message
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from rich import print
+from pyrogram.errors import BadMsgNotification
+import asyncio
 
 # Initialize Pyrogram client
 bot = Client(
@@ -119,5 +121,13 @@ async def reset(client, message):
         await message.reply_text("No data found to reset. Type /start to set up.")
 
 
-if __name__ == "__main__":
-    bot.run()
+async def main():
+    try:
+        await bot.start()
+        print("Bot Started!") 
+    except BadMsgNotification as e:
+        print(f"Error: {e}. Retrying...")
+        await asyncio.sleep(2)  # Short delay before retry
+        await bot.start()
+
+bot.run(main)
