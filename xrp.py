@@ -126,6 +126,9 @@ class CustomPDF(FPDF):
     def set_background(self, image_path):
         self.image(image_path, x=0, y=0, w=self.w, h=self.h)
 
+def generate_pdf_id():
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+
 def generate_pdf(message, cookies, balance_info):
     chat_id = message.chat.id  # Get chat_id directly from the message object
     pdf = CustomPDF(chat_id)  # Pass the chat_id when initializing CustomPDF
