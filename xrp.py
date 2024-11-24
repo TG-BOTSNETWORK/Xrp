@@ -106,7 +106,7 @@ class CustomPDF(FPDF):
         super().__init__(*args, **kwargs)
         self.chat_id = chat_id
         # Add a UTF-8 compatible font
-        self.add_font('DejaVu', '', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', uni=True)
+        self.add_font('DejaVu', '', 'assets/DejaVuSans.ttf, uni=True)
         self.set_font('DejaVu', '', 12)
 
     def header(self):
@@ -139,7 +139,7 @@ def generate_pdf(message, cookies, balance_info):
     pdf = CustomPDF(chat_id)
     pdf.add_page()
     pdf.set_background('background.jpg')
-    pdf.add_watermark('Trickopedia')
+    pdf.add_watermark('XRP MINER BY NOBITHA')
     pdf.set_font("DejaVu", size=12)
     pdf.set_text_color(0, 0, 0)
     pdf.ln(40)
