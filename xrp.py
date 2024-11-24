@@ -8,7 +8,7 @@ from pyrogram import filters, idle
 from pyrogram.types import Message
 from pyrogram import Client
 from pyromod import listen
-from fdpf import FPDF
+from fpdf import FPDF
 import random
 import string
 
