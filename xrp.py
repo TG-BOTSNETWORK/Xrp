@@ -106,7 +106,7 @@ class CustomPDF(FPDF):
         super().__init__(*args, **kwargs)
         self.chat_id = chat_id
         # Add a UTF-8 compatible font
-        self.add_font('DejaVu', '', 'assets/DejaVuSans.ttf, uni=True)
+        self.add_font('DejaVu', '', 'assets/DejaVuSans.ttf', uni=True)
         self.set_font('DejaVu', '', 12)
 
     def header(self):
